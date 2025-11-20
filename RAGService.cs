@@ -25,7 +25,7 @@ namespace WpfApp1
             dataSourceBuilder.UseVector();
             _dataSource = dataSourceBuilder.Build();
 
-            VectorStore _vectorStore = new PostgresVectorStore(_dataSource, ownsDataSource: true);
+            _vectorStore = new PostgresVectorStore(_dataSource, ownsDataSource: true);
         }
 
         /// <summary>
@@ -100,7 +100,7 @@ namespace WpfApp1
             }
 
             var hybridSearchCollection = (IKeywordHybridSearchable<DocumentChunk>)_vectorStore.GetCollection<int, DocumentChunk>(_tableName);
-            var searchResults = hybridSearchCollection.HybridSearchAsync(embeddings, keywords, top: top);
+            var searchResults = hybridSearchCollection.HybridSearchAsync(embeddings[0], keywords, top: top);
 
             var results = new List<DocumentSearchResult>();
             await foreach (var result in searchResults)
@@ -132,7 +132,7 @@ namespace WpfApp1
             }
 
             var searchCollection = _vectorStore.GetCollection<int, DocumentChunk>(_tableName);
-            var searchResults = searchCollection.SearchAsync(embeddings, top: top);
+            var searchResults = searchCollection.SearchAsync(embeddings[0], top: top);
 
             var results = new List<DocumentSearchResult>();
             await foreach (var result in searchResults)
