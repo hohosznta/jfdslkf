@@ -38,18 +38,21 @@ namespace WpfApp1
 
         /// <summary>
         /// Document chunk model matching LlamaIndex schema.
-        /// Schema: id, text, metadata, node_id, embedding, text_search_tsv
+        /// Schema: id, text, metadata, node_id, embedding, text_search_tsv, category
         /// </summary>
         public class DocumentChunk
         {
             [VectorStoreKey(StorageName = "id")]
-            public int Id { get; set; } 
+            public int Id { get; set; }
 
             [VectorStoreData(StorageName = "text")]
-            public string Text { get; set; } 
+            public string Text { get; set; }
 
             [VectorStoreData(StorageName = "metadata_")]
-            public string Metadata { get; set; } 
+            public string Metadata { get; set; }
+
+            [VectorStoreData(StorageName = "categories", IsIndexed = true)]
+            public List<string> Category { get; set; }
 
             [VectorStoreVector(Dimensions: 1024, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw, StorageName = "embedding")]
             public ReadOnlyMemory<float>? Embedding { get; set; }
@@ -90,9 +93,8 @@ namespace WpfApp1
         public async Task<List<DocumentSearchResult>> HybridSearchAsync(
             string searchText,
             string[] keywords,
-            int top = 5)
+            int top )
         {
-            // Generate embedding for search text using KURE-v1
             var embeddings = await _embeddingService.GetEmbeddingsAsync(searchText);
             if (embeddings.Length == 0)
             {
@@ -122,17 +124,23 @@ namespace WpfApp1
         /// </summary>
         public async Task<List<DocumentSearchResult>> VectorSearchAsync(
             string searchText,
-            int top = 5)
+            int top,
+            string category)
         {
-            // Generate embedding for search text using KURE-v1
             var embeddings = await _embeddingService.GetEmbeddingsAsync(searchText);
             if (embeddings.Length == 0)
             {
                 return new List<DocumentSearchResult>();
             }
 
+            var vectorSearchOptions = new VectorSearchOptions<DocumentChunk>
+            {
+                Filter = r => r.Category.Contains(category)
+            };
+
+
             var searchCollection = _vectorStore.GetCollection<int, DocumentChunk>(_tableName);
-            var searchResults = searchCollection.SearchAsync(embeddings[0], top: top);
+            var searchResults = searchCollection.SearchAsync(embeddings[0], top: top, vectorSearchOptions);
 
             var results = new List<DocumentSearchResult>();
             await foreach (var result in searchResults)
@@ -155,7 +163,8 @@ namespace WpfApp1
         public async Task<List<DocumentSearchResult>> SearchDocumentsAsync(
             string query,
             string[] keywords = null,
-            int top = 5)
+            int top = 3,
+            string category=null)
         {
             if (keywords != null && keywords.Length > 0)
             {
@@ -163,7 +172,7 @@ namespace WpfApp1
             }
             else
             {
-                return await VectorSearchAsync(query, top);
+                return await VectorSearchAsync(query, top, category);
             }
         }
 

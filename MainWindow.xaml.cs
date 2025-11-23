@@ -246,8 +246,19 @@ namespace WpfApp1
 
             try
             {
-                // 1. 데이터베이스에서 검색
-                var searchResults = await _ragService.SearchDocumentsAsync(message, top: 5);
+                // 선택된 카테고리 가져오기
+                string? selectedCategory = null;
+                if (CategoryComboBox.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    selectedCategory = selectedItem.Tag?.ToString();
+                    if (string.IsNullOrEmpty(selectedCategory))
+                    {
+                        selectedCategory = null; // "전체" 선택 시 null로 처리
+                    }
+                }
+
+                // 1. 데이터베이스에서 검색 (category 필터 적용)
+                var searchResults = await _ragService.SearchDocumentsAsync(message, top: 1, category: selectedCategory);
 
                 // 로딩 메시지 제거
                 ChatMessagesPanel.Children.Remove(loadingBorder);
