@@ -18,23 +18,29 @@ namespace WpfApp1
     public partial class MainWindow : Window
     {
         private readonly RAGService _ragService;
+        private readonly LLMService _llmService;
         private bool _isProcessing = false;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            // Initialize RAGService
+            // Initialize services
             _ragService = new RAGService();
+            _llmService = new LLMService();
 
             LoadInitialMessage();
-            InitializeModelAsync();
+            InitializeModelsAsync();
         }
 
-        private async void InitializeModelAsync()
+        private async void InitializeModelsAsync()
         {
-            await Task.Run(() => _ragService.InitializeModel());
-            AddClaudeMessage("모델이 준비되었습니다. 무엇을 검색하시겠습니까?");
+            await Task.Run(() =>
+            {
+                _ragService.InitializeModel();
+                _llmService.InitializeModel();
+            });
+            AddClaudeMessage("모델이 준비되었습니다. 무엇을 도와드릴까요?");
         }
 
         private void LoadInitialMessage()
@@ -75,15 +81,19 @@ namespace WpfApp1
 
             stackPanel.Children.Add(headerPanel);
 
-            // 메시지 내용
-            var messageText = new TextBlock
+            // 메시지 내용 (TextBox를 읽기 전용으로 사용하여 복사 가능하게)
+            var messageText = new TextBox
             {
                 Text = message,
                 FontSize = 14,
                 Foreground = new SolidColorBrush(Color.FromRgb(26, 26, 26)),
                 TextWrapping = TextWrapping.Wrap,
-                LineHeight = 22,
-                Margin = new Thickness(0, 0, 0, 15)
+                Margin = new Thickness(0, 0, 0, 15),
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Padding = new Thickness(0),
+                Cursor = Cursors.IBeam
             };
 
             stackPanel.Children.Add(messageText);
@@ -144,14 +154,18 @@ namespace WpfApp1
 
             stackPanel.Children.Add(header);
 
-            // 메시지 내용
-            var messageText = new TextBlock
+            // 메시지 내용 (TextBox를 읽기 전용으로 사용하여 복사 가능하게)
+            var messageText = new TextBox
             {
                 Text = message,
                 FontSize = 14,
                 Foreground = new SolidColorBrush(Color.FromRgb(26, 26, 26)),
                 TextWrapping = TextWrapping.Wrap,
-                LineHeight = 22
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Padding = new Thickness(0),
+                Cursor = Cursors.IBeam
             };
 
             stackPanel.Children.Add(messageText);
@@ -232,21 +246,75 @@ namespace WpfApp1
 
             try
             {
-                // 데이터베이스에서 검색
+                // 1. 데이터베이스에서 검색
                 var searchResults = await _ragService.SearchDocumentsAsync(message, top: 5);
 
                 // 로딩 메시지 제거
                 ChatMessagesPanel.Children.Remove(loadingBorder);
 
+                // 2. 스트리밍 메시지 블록 생성 (빈 상태로 시작)
+                var streamingMessageBlock = CreateStreamingMessageBlock();
+                var messageTextBlock = streamingMessageBlock.Item1;
+                var messageContainer = streamingMessageBlock.Item2;
+                var fullResponse = new StringBuilder();
+
                 if (searchResults.Count == 0)
                 {
-                    AddClaudeMessage("검색 결과가 없습니다. 다른 검색어를 시도해주세요.");
+                    // 검색 결과가 없으면 LLM이 직접 답변
+                    await _llmService.GenerateStreamingResponseAsync(
+                        message,
+                        token =>
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                fullResponse.Append(token);
+                                var text = fullResponse.ToString();
+
+                                // 종료 토큰 제거
+                                text = text.Replace("<|im_end|>", "")
+                                          .Replace("<|endoftext|>", "")
+                                          .Replace("</s>", "");
+
+                                messageTextBlock.Text = text;
+                            });
+                        });
                 }
                 else
                 {
-                    // 검색 결과 포맷팅
-                    var resultMessage = FormatSearchResults(searchResults);
-                    AddClaudeMessage(resultMessage);
+                    // 2. 검색 결과를 컨텍스트로 변환
+                    var context = BuildContext(searchResults);
+
+                    // 3. LLM에 컨텍스트와 함께 질문 전달 (스트리밍)
+                    await _llmService.GenerateStreamingResponseAsync(
+                        message,
+                        token =>
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                fullResponse.Append(token);
+                                var text = fullResponse.ToString();
+
+                                // 종료 토큰 제거
+                                text = text.Replace("<|im_end|>", "")
+                                          .Replace("<|endoftext|>", "")
+                                          .Replace("</s>", "");
+
+                                messageTextBlock.Text = text;
+                            });
+                        },
+                        context);
+
+                    // 4. 스트리밍 완료 후 출처 정보 추가
+                    Dispatcher.Invoke(() =>
+                    {
+                        var cleanResponse = fullResponse.ToString()
+                            .Replace("<|im_end|>", "")
+                            .Replace("<|endoftext|>", "")
+                            .Replace("</s>", "");
+
+                        var finalResponse = FormatResponseWithSources(cleanResponse, searchResults);
+                        messageTextBlock.Text = finalResponse;
+                    });
                 }
             }
             catch (Exception ex)
@@ -254,7 +322,7 @@ namespace WpfApp1
                 // 로딩 메시지 제거
                 ChatMessagesPanel.Children.Remove(loadingBorder);
 
-                AddClaudeMessage($"검색 중 오류가 발생했습니다: {ex.Message}");
+                AddClaudeMessage($"오류가 발생했습니다: {ex.Message}");
             }
             finally
             {
@@ -262,7 +330,7 @@ namespace WpfApp1
             }
         }
 
-        private Border AddLoadingMessage()
+        private Border AddLoadingMessage(string message = "검색 중...")
         {
             var loadingBorder = new Border
             {
@@ -294,7 +362,7 @@ namespace WpfApp1
 
             var loadingText = new TextBlock
             {
-                Text = "검색 중...",
+                Text = message,
                 FontSize = 14,
                 Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102)),
                 FontStyle = FontStyles.Italic
@@ -305,6 +373,161 @@ namespace WpfApp1
             ChatMessagesPanel.Children.Add(loadingBorder);
 
             return loadingBorder;
+        }
+
+        /// <summary>
+        /// Creates a message block for streaming responses.
+        /// Returns a tuple of (TextBox for message content, Border container).
+        /// </summary>
+        private (TextBox, Border) CreateStreamingMessageBlock()
+        {
+            var messageBlock = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                Padding = new Thickness(60, 30, 60, 30),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(229, 229, 229)),
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+
+            var stackPanel = new StackPanel();
+
+            // 아이콘과 타이틀
+            var headerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+
+            var icon = new TextBlock
+            {
+                Text = "✱",
+                FontSize = 16,
+                Foreground = new SolidColorBrush(Color.FromRgb(217, 122, 90)),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            headerPanel.Children.Add(icon);
+            stackPanel.Children.Add(headerPanel);
+
+            // 메시지 내용 (스트리밍으로 업데이트될 TextBox - 복사 가능)
+            var messageText = new TextBox
+            {
+                Text = "",
+                FontSize = 14,
+                Foreground = new SolidColorBrush(Color.FromRgb(26, 26, 26)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 15),
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Padding = new Thickness(0),
+                Cursor = Cursors.IBeam
+            };
+
+            stackPanel.Children.Add(messageText);
+
+            // 하단 액션 버튼들
+            var actionPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            var copyButton = CreateActionButton("📋");
+            var likeButton = CreateActionButton("👍");
+            var dislikeButton = CreateActionButton("👎");
+            var retryButton = new TextBlock
+            {
+                Text = "재시도",
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102)),
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand
+            };
+
+            actionPanel.Children.Add(copyButton);
+            actionPanel.Children.Add(likeButton);
+            actionPanel.Children.Add(dislikeButton);
+            actionPanel.Children.Add(retryButton);
+
+            stackPanel.Children.Add(actionPanel);
+
+            messageBlock.Child = stackPanel;
+            ChatMessagesPanel.Children.Add(messageBlock);
+
+            return (messageText, messageBlock);
+        }
+
+        /// <summary>
+        /// 검색 결과를 LLM 컨텍스트로 변환
+        /// </summary>
+        private string BuildContext(List<RAGService.DocumentSearchResult> results)
+        {
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                var result = results[i];
+                sb.AppendLine($"[문서 {i + 1}]");
+                sb.AppendLine(result.Text);
+
+                var metadata = result.GetMetadataDict();
+                if (metadata.Count > 0)
+                {
+                    sb.Append("출처: ");
+                    sb.AppendLine(string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value}")));
+                }
+
+                if (i < results.Count - 1)
+                {
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// LLM 답변과 출처 문서를 함께 포맷팅
+        /// </summary>
+        private string FormatResponseWithSources(string llmResponse, List<RAGService.DocumentSearchResult> sources)
+        {
+            var sb = new StringBuilder();
+
+            // LLM 답변
+            sb.AppendLine(llmResponse.Trim());
+            sb.AppendLine();
+            sb.AppendLine("━━━━━━━━━━━━━━━━━━━━━━");
+            sb.AppendLine();
+            sb.AppendLine($"📚 참고 문서 ({sources.Count}건):");
+            sb.AppendLine();
+
+            // 출처 문서
+            for (int i = 0; i < sources.Count; i++)
+            {
+                var source = sources[i];
+                sb.AppendLine($"【{i + 1}】 {source.Text.Substring(0, Math.Min(100, source.Text.Length))}...");
+
+                if (source.Score.HasValue)
+                {
+                    sb.AppendLine($"   유사도: {source.Score.Value:F4}");
+                }
+
+                var metadata = source.GetMetadataDict();
+                if (metadata.Count > 0)
+                {
+                    sb.AppendLine($"   출처: {string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value}"))}");
+                }
+
+                if (i < sources.Count - 1)
+                {
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString();
         }
 
         private string FormatSearchResults(List<RAGService.DocumentSearchResult> results)

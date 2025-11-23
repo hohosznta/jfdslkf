@@ -61,42 +61,7 @@
                      Background="#FAFAF9"
                      Padding="20">
             <StackPanel x:Name="ChatMessagesPanel" Margin="0">
-                <!-- Sample User Message -->
-                <Border Background="#FFFFFF"
-                       CornerRadius="18"
-                       Padding="16,12"
-                       Margin="0,5,0,10"
-                       HorizontalAlignment="Right"
-                       MaxWidth="600">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#E5E5E5" BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
-                    </Border.Effect>
-                    <TextBlock Text="Qdrant에서 pgvector로 마이그레이션하는 방법을 알려주세요."
-                              TextWrapping="Wrap"
-                              Foreground="#1A1A1A"
-                              FontSize="14"/>
-                </Border>
-
-                <!-- Sample Assistant Message -->
-                <Border Background="#F5F5F4"
-                       CornerRadius="18"
-                       Padding="16,12"
-                       Margin="0,5,0,10"
-                       HorizontalAlignment="Left"
-                       MaxWidth="700">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#E5E5E5" BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="Qdrant에서 pgvector로 마이그레이션하는 과정을 단계별로 안내해드리겠습니다."
-                                  TextWrapping="Wrap"
-                                  Foreground="#1A1A1A"
-                                  FontSize="14"
-                                  LineHeight="20"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Additional messages will be added here -->
+                <!-- Chat messages will be added here dynamically -->
             </StackPanel>
         </ScrollViewer>
 

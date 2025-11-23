@@ -14,8 +14,8 @@ namespace WpfApp1
         private readonly VectorStore _vectorStore;
 
         public RAGService(
-            string connectionString = "Host=localhost;Database=vector_db;Username=postgres;Password=Bluegood166*!",
-            string tableName = "knowledge_base")
+            string connectionString = "Host=localhost;Database=postgres;Username=postgres;Password=password",
+            string tableName = "data_contextual_rag_vectors")
         {
             _connectionString = connectionString;
             _tableName = tableName;
