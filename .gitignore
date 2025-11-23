@@ -1,6 +1,7 @@
 # Model files (ONNX and tokenizer)
-WpfApp1/model/
+model/
 *.onnx
+*.onnx.data
 tokenizer.json
 
 # Build results
