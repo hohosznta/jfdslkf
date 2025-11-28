@@ -18,7 +18,7 @@ namespace WpfApp1
         private readonly SharpKiwi _kiwi;
 
         public RAGService(
-            string connectionString = "Host=localhost;Database=postgres;Username=postgres;Password=password",
+            string connectionString = "Host=172.30.1.95;Database=postgres;Username=postgres;Password=Bluegood166*!",
             string tableName = "data_contextual_rag_vectors")
         {
             _connectionString = connectionString;

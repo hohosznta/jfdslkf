@@ -92,33 +92,6 @@ namespace WpfApp1
 
             stackPanel.Children.Add(messageText);
 
-            // 하단 액션 버튼들
-            var actionPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-
-            var copyButton = CreateActionButton("📋");
-            var likeButton = CreateActionButton("👍");
-            var dislikeButton = CreateActionButton("👎");
-            var retryButton = new TextBlock
-            {
-                Text = "재시도",
-                FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102)),
-                Margin = new Thickness(10, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Cursor = Cursors.Hand
-            };
-
-            actionPanel.Children.Add(copyButton);
-            actionPanel.Children.Add(likeButton);
-            actionPanel.Children.Add(dislikeButton);
-            actionPanel.Children.Add(retryButton);
-
-            stackPanel.Children.Add(actionPanel);
-
             messageBlock.Child = stackPanel;
             ChatMessagesPanel.Children.Add(messageBlock);
         }
@@ -478,13 +451,6 @@ namespace WpfApp1
                 sb.AppendLine($"[문서 {i + 1}]");
                 sb.AppendLine(result.Text);
 
-                var metadata = result.GetMetadataDict();
-                if (metadata.Count > 0)
-                {
-                    sb.Append("출처: ");
-                    sb.AppendLine(string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value}")));
-                }
-
                 if (i < results.Count - 1)
                 {
                     sb.AppendLine();
@@ -520,45 +486,10 @@ namespace WpfApp1
                     sb.AppendLine($"   유사도: {source.Score.Value:F4}");
                 }
 
-                var metadata = source.GetMetadataDict();
-                if (metadata.Count > 0)
-                {
-                    sb.AppendLine($"   출처: {string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value}"))}");
-                }
+                // 원문 텍스트 표시 (전체 텍스트 또는 일부)
+                sb.AppendLine($"   출처: {source.Text}");
 
                 if (i < sources.Count - 1)
-                {
-                    sb.AppendLine();
-                }
-            }
-
-            return sb.ToString();
-        }
-
-        private string FormatSearchResults(List<RAGService.DocumentSearchResult> results)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"검색 결과 {results.Count}건을 찾았습니다:\n");
-
-            for (int i = 0; i < results.Count; i++)
-            {
-                var result = results[i];
-                sb.AppendLine($"【{i + 1}】");
-                sb.AppendLine(result.Text);
-
-                if (result.Score.HasValue)
-                {
-                    sb.AppendLine($"(유사도: {result.Score.Value:F4})");
-                }
-
-                var metadata = result.GetMetadataDict();
-                if (metadata.Count > 0)
-                {
-                    sb.Append("메타데이터: ");
-                    sb.AppendLine(string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value}")));
-                }
-
-                if (i < results.Count - 1)
                 {
                     sb.AppendLine();
                 }

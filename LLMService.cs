@@ -40,52 +40,6 @@ namespace WpfApp1
         }
 
         /// <summary>
-        /// Generate a response given a user prompt and optional context.
-        /// </summary>
-        public async Task<string> GenerateResponseAsync(string userPrompt, string? context = null, int maxLength = 8000)
-        {
-            if (!_isInitialized || _model == null || _tokenizer == null)
-            {
-                InitializeModel();
-            }
-
-            // Build prompt with context if provided
-            string fullPrompt;
-            if (!string.IsNullOrEmpty(context))
-            {
-                fullPrompt = $"<|im_start|>system\n다음 문서를 참고하여 사용자의 질문에 답변해주세요:\n\n{context}<|im_end|>\n<|im_start|>user\n{userPrompt}<|im_end|>\n<|im_start|>assistant\n";
-            }
-            else
-            {
-                fullPrompt = $"<|im_start|>user\n{userPrompt}<|im_end|>\n<|im_start|>assistant\n";
-            }
-
-            return await Task.Run(() =>
-            {
-                var sequences = _tokenizer!.Encode(fullPrompt);
-
-                using var generatorParams = new GeneratorParams(_model!);
-                generatorParams.SetSearchOption("max_length", maxLength);
-
-                using var generator = new Generator(_model!, generatorParams);
-                generator.AppendTokenSequences(sequences);
-
-                var responseBuilder = new StringBuilder();
-                using var tokenizerStream = _tokenizer.CreateStream();
-
-                while (!generator.IsDone())
-                {
-                    generator.GenerateNextToken();
-                    var token = generator.GetSequence(0)[^1];
-                    var decodedToken = tokenizerStream.Decode(token);
-                    responseBuilder.Append(decodedToken);
-                }
-
-                return responseBuilder.ToString();
-            });
-        }
-
-        /// <summary>
         /// Generate a streaming response with callback for each token.
         /// </summary>
         public async Task GenerateStreamingResponseAsync(
@@ -103,7 +57,7 @@ namespace WpfApp1
             string fullPrompt;
             if (!string.IsNullOrEmpty(context))
             {
-                fullPrompt = $"<|im_start|>system\n다음 문서를 참고하여 사용자의 질문에 답변해주세요:\n\n{context}<|im_end|>\n<|im_start|>user\n{userPrompt}<|im_end|>\n<|im_start|>assistant\n";
+                fullPrompt = $"<|im_start|>system\nPlease refer to the following document and answer the user's question.:\n\n{context} \n\nuser\n{userPrompt} \n\nassistant\n";
             }
             else
             {
@@ -136,6 +90,8 @@ namespace WpfApp1
                     var currentText = fullText.ToString();
                     if (currentText.Contains("<|im_end|>") ||
                         currentText.Contains("<|endoftext|>") ||
+                        currentText.Contains("|im_end|>") ||
+                        currentText.Contains("|im_end|") ||
                         currentText.Contains("</s>"))
                     {
                         break;

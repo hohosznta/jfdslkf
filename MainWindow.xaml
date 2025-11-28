@@ -36,7 +36,7 @@
 
                 <!-- Center Title -->
                 <TextBlock Grid.Column="1"
-                          Text="Qdrant에서 pgvector로 마이그레이션"
+                          Text=""
                           FontSize="13"
                           Foreground="#666666"
                           VerticalAlignment="Center"
